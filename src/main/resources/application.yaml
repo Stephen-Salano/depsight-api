@@ -1,3 +1,63 @@
 spring:
   application:
     name: Depsight4J
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          time_zone: UTC
+  web:
+    error:
+      include-binding-errors: never
+      include-exception: false
+      include-stacktrace: never
+
+# Server
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types:  application/json, application/xml, text/html, text/xml, text/plain
+
+#Actuator
+management:
+  server:
+    port: 9091
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always
+
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${spring.profiles.active}
+      version: ${info.app.version}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        step: 1m
+
+info:
+  app:
+    name: ${spring.application.name}
+    version: ${project.version:0.0.1-SNAPSHOT}
+    description: A dependency management tool
+  author:
+    name: "Stephen Salano"
+sonatype:
+  api-key: ${SONATYPE_API_KEY}
