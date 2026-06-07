@@ -1,7 +1,7 @@
 spring:
   application:
     name: Depsight4J
-
+    frontend-url: ${FRONTEND_URL:http://localhost:3000}
   jpa:
     show-sql: false
     properties:
