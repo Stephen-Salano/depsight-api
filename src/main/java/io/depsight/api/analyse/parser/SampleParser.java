@@ -1,4 +1,18 @@
-<?xml version="1.0" encoding="UTF-8"?>
+package io.depsight.api.analyse.parser;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.List;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+
+public class SampleParser {
+  public static void main(String[] args) throws IOException, XmlPullParserException {
+
+    String pomxml =
+"""
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
@@ -89,10 +103,9 @@
       <version>${org.mapstruct.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.maven</groupId>
+      <groupId>maven</groupId>
       <artifactId>maven-model</artifactId>
       <version>3.9.6</version>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
@@ -140,56 +153,22 @@
       <scope>runtime</scope>
     </dependency>
   </dependencies>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>
-              <groupId>org.projectlombok</groupId>
-              <artifactId>lombok</artifactId>
-            </exclude>
-          </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>default-compile</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <annotationProcessorPaths>
-                <path>
-                  <groupId>org.projectlombok</groupId>
-                  <artifactId>lombok</artifactId>
-                </path>
-              </annotationProcessorPaths>
-            </configuration>
-          </execution>
-          <execution>
-            <id>default-testCompile</id>
-            <phase>test-compile</phase>
-            <goals>
-              <goal>testCompile</goal>
-            </goals>
-            <configuration>
-              <annotationProcessorPaths>
-                <path>
-                  <groupId>org.projectlombok</groupId>
-                  <artifactId>lombok</artifactId>
-                </path>
-              </annotationProcessorPaths>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
 </project>
+
+""";
+    MavenXpp3Reader reader = new MavenXpp3Reader();
+    Model model = reader.read(new StringReader(pomxml));
+
+    // Basic Project info
+    System.out.println("groupId: " + model.getGroupId());
+    System.out.println("artifactId: " + model.getArtifactId());
+    System.out.println("version: " + model.getVersion());
+
+    // dependencies
+    List<Dependency> dependencies = model.getDependencies();
+    System.out.println("\ndependencies:");
+    for (Dependency dep : dependencies) {
+      System.out.println(dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion());
+    }
+  }
+}
