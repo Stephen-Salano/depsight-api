@@ -60,4 +60,4 @@ info:
   author:
     name: "Stephen Salano"
 sonatype:
-  api-key: ${SONATYPE_API_KEY}
+  api-key: ${SONATYPE_API_KEY:placeholder}
