@@ -1,11 +1,8 @@
 package io.depsight.api.analyse.parser;
 
+import io.depsight.api.analyse.dto.request.ParsedDependency;
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.List;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 public class SampleParser {
@@ -156,19 +153,8 @@ public class SampleParser {
 </project>
 
 """;
-    MavenXpp3Reader reader = new MavenXpp3Reader();
-    Model model = reader.read(new StringReader(pomxml));
 
-    // Basic Project info
-    System.out.println("groupId: " + model.getGroupId());
-    System.out.println("artifactId: " + model.getArtifactId());
-    System.out.println("version: " + model.getVersion());
-
-    // dependencies
-    List<Dependency> dependencies = model.getDependencies();
-    System.out.println("\ndependencies:");
-    for (Dependency dep : dependencies) {
-      System.out.println(dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion());
-    }
+    List<ParsedDependency> dependencies = PomParser.parse(pomxml);
+    dependencies.forEach(dep -> System.out.println(dep));
   }
 }
