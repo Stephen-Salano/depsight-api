@@ -1,8 +1,6 @@
 package io.depsight.api.analyse.parser;
 
-import io.depsight.api.analyse.dto.request.ParsedDependency;
 import java.io.IOException;
-import java.util.List;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 public class SampleParser {
@@ -154,7 +152,9 @@ public class SampleParser {
 
 """;
 
-    List<ParsedDependency> dependencies = PomParser.parse(pomxml);
-    dependencies.forEach(dep -> System.out.println(dep));
+    // List<ParsedDependency> dependencies;
+    // Model model = PomParser.parse(pomxml);
+    // dependencies = model.getDependencyManagement().getDependencies();
+    // dependencies.forEach(dep -> System.out.println(dep));
   }
 }

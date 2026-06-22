@@ -2,8 +2,8 @@ spring:
   datasource:
     url: ${DEV_DB_URL :jdbc:postgresql://localhost:5432/depsight4j}
     driver-class-name: org.postgresql.Driver
-    username: ${DEV_DB_USERNAME}
-    password: ${DEV_DB_PASSWORD}
+    username: ${DEV_DB_USERNAME:postgres}
+    password: ${DEV_DB_PASSWORD:Microsoft254$}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

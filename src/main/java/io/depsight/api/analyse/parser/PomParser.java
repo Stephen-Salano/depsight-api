@@ -1,5 +1,6 @@
 package io.depsight.api.analyse.parser;
 
+import io.depsight.api.analyse.dto.request.MavenCooridinates;
 import io.depsight.api.analyse.dto.request.ParsedDependency;
 import io.depsight.api.common.exception.BadRequestException;
 import java.io.IOException;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
+import org.apache.maven.model.Parent;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
@@ -19,9 +21,9 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 @Slf4j
 public class PomParser {
 
-  private static String UNRESOLVED = "Unresolved";
+  private static String UNRESOLVED = "UNRESOLVED";
 
-  public static List<ParsedDependency> parse(String pomXml) throws BadRequestException {
+  public static Model parse(String pomXml) throws BadRequestException {
     log.info("cleaning pom file");
     String cleanedPom = cleanPom(pomXml);
     validatePom(cleanedPom);
@@ -33,12 +35,19 @@ public class PomParser {
       log.error("Failed to parse POM: {}", e.getMessage());
       throw new BadRequestException("Invalid POM structure" + e.getMessage());
     }
-    Map<String, String> properties = extractProperties(model);
-    List<ParsedDependency> deps = extractDependencies(model, properties);
-    return deps;
+    return model;
   }
 
-  private static List<ParsedDependency> extractDependencies(
+  public static MavenCooridinates extractParent(Model model) {
+    Parent parent = model.getParent();
+
+    if (parent == null) {
+      return null;
+    }
+    return new MavenCooridinates(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
+  }
+
+  public static List<ParsedDependency> extractDependencies(
       Model model, Map<String, String> properties) {
     // get deps
     List<Dependency> parsedDependencies = model.getDependencies();
@@ -63,7 +72,7 @@ public class PomParser {
     return result;
   }
 
-  private static Map<String, String> extractProperties(Model model) {
+  public static Map<String, String> extractProperties(Model model) {
     Map<String, String> properties = new HashMap<>();
     if (!model.getProperties().isEmpty()) {
       model
