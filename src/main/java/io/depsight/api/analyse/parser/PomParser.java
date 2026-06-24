@@ -23,6 +23,17 @@ public class PomParser {
 
   private static String UNRESOLVED = "UNRESOLVED";
 
+  /**
+   * The parse method returns a model now becuase AnalyseServiceImpl now needs to do more with the
+   * parsed data(extract deps, extract he parent pointer) Returning a model lets the {@link
+   * io.depsight.api.analyse.service.AnalyseServiceImpl} do what it needs Model will now hold the
+   * entire pom as a Java Object
+   *
+   * @param pomXml The pomxml string pasted by the user
+   * @return a Model object the raw parsed pom.xml that contains everything dependencies,
+   *     properties, parent info etc.
+   * @throws BadRequestException
+   */
   public static Model parse(String pomXml) throws BadRequestException {
     log.info("cleaning pom file");
     String cleanedPom = cleanPom(pomXml);
@@ -72,6 +83,15 @@ public class PomParser {
     return result;
   }
 
+  /**
+   * Some poms define version numbers as variables
+   * ``<org.mapstruct.version>1.6.3</org.mapstruct.version>` Then use them like
+   * `<version>${org.mapstruct.version}</version>` This method reads the properties block and builds
+   * a map: "org.mapstruct.version" → "1.6.3"
+   *
+   * @param model the parsed pom.xml now as a Java object
+   * @return A map of properties
+   */
   public static Map<String, String> extractProperties(Model model) {
     Map<String, String> properties = new HashMap<>();
     if (!model.getProperties().isEmpty()) {
