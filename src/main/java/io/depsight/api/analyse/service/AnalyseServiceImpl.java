@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AnalyseServiceImpl implements AnalyseService {
 
+  private final ParentBomResolver parentBomResolver;
+
   @Override
   public List<ParsedDependency> analyse(AnalyseRequest request) {
     // extract the string and call Pom parser static method
@@ -31,7 +33,7 @@ public class AnalyseServiceImpl implements AnalyseService {
     if (cooridinates == null) {
       return dependencies; // no parent bom
     }
-    List<ParsedDependency> resolved = ParentBomResolver.resolveParent(cooridinates, dependencies);
+    List<ParsedDependency> resolved = parentBomResolver.resolveParent(cooridinates, dependencies);
     return resolved;
   }
 }

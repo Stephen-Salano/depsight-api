@@ -16,7 +16,7 @@ public class MavenCentralClient {
     this.client = builder.baseUrl("https://repo1.maven.org/maven2/").build();
   }
 
-  public Mono<String> fetchPom(String groupId, String artifactId, String version) {
+  public Mono<String> fetchPomXml(String groupId, String artifactId, String version) {
     return client
         .get()
         .uri(buildUrl(groupId, artifactId, version))

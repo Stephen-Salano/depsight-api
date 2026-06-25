@@ -3,10 +3,8 @@ package io.depsight.api.analyse.resolver;
 import io.depsight.api.analyse.dto.request.MavenCooridinates;
 import io.depsight.api.analyse.dto.request.ParsedDependency;
 import io.depsight.api.analyse.parser.PomParser;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import io.depsight.api.common.exception.ResourceNotFoundException;
+import io.depsight.api.infrastructure.maven.MavenCentralClient;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,14 +13,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
+import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
 @Slf4j
+@Service
 public class ParentBomResolver {
   // TODO: Add @Service when we connect it to MavenCentralClient => turn it into a Spring class
 
   private static final String UNRESOLVED = "UNRESOLVED";
-  private static final String BASE_URL = "https://repo1.maven.org/maven2/";
+  // private static final String BASE_URL = "https://repo1.maven.org/maven2/";
+  private final MavenCentralClient mavenCentralClient;
 
   /**
    * This is the main resolver method. Takes a users resolved pom as {@link ParsedDependency} and
@@ -34,13 +35,20 @@ public class ParentBomResolver {
    * @param dependencies Users parsed Dependecies from the pasted POM
    * @return A list of {@link ParsedDependency}
    */
-  public static List<ParsedDependency> resolveParent(
+  public List<ParsedDependency> resolveParent(
       MavenCooridinates cooridinates, List<ParsedDependency> dependencies) {
     String pomXml =
-        fetchPomXml(
-            cooridinates.parentGroupId(),
-            cooridinates.parentArtifactId(),
-            cooridinates.parentVersion());
+        mavenCentralClient
+            .fetchPomXml(
+                cooridinates.parentGroupId(),
+                cooridinates.parentArtifactId(),
+                cooridinates.parentVersion())
+            .block(); // Sequential calls so okay to block
+
+    if (pomXml == null) {
+      throw new ResourceNotFoundException(
+          "Parent Pom not found: " + cooridinates.parentArtifactId());
+    }
 
     Model model = PomParser.parse(pomXml);
 
@@ -52,11 +60,17 @@ public class ParentBomResolver {
       MavenCooridinates parentCoordinates = PomParser.extractParent(model);
 
       String parentPomXml =
-          fetchPomXml(
-              parentCoordinates.parentGroupId(),
-              parentCoordinates.parentArtifactId(),
-              parentCoordinates.parentVersion());
+          mavenCentralClient
+              .fetchPomXml(
+                  parentCoordinates.parentGroupId(),
+                  parentCoordinates.parentArtifactId(),
+                  parentCoordinates.parentVersion())
+              .block(); // Sequential calls so okay to block
 
+      if (parentPomXml == null) {
+        throw new ResourceNotFoundException(
+            "Parent Pom not found: " + parentCoordinates.parentArtifactId());
+      }
       Model parentModel = PomParser.parse(parentPomXml);
       Map<String, String> parentProperties = PomParser.extractProperties(parentModel);
       Map<String, String> parentBom = extractBom(parentModel, parentProperties);
@@ -75,7 +89,7 @@ public class ParentBomResolver {
    * @param bom the parent bom pom
    * @return List of {@link io.depsight.api.analyse.dto.request.ParsedDependency}
    */
-  private static List<ParsedDependency> applyBom(
+  private List<ParsedDependency> applyBom(
       List<ParsedDependency> dependencies, Map<String, String> bom) {
     List<ParsedDependency> result = new ArrayList<>();
 
@@ -102,7 +116,7 @@ public class ParentBomResolver {
    * @param properties the properties section in pomxml
    * @return a Map of Dependency and the version value
    */
-  private static Map<String, String> extractBom(Model model, Map<String, String> properties) {
+  private Map<String, String> extractBom(Model model, Map<String, String> properties) {
     Map<String, String> bom = new HashMap<>();
 
     if (model.getDependencyManagement() == null) {
@@ -123,50 +137,56 @@ public class ParentBomResolver {
     return bom;
   }
 
-  /**
-   * This method uses the {@link MavenCooridinates} to form a link to fetch the pomxml from the
-   * maven repo
-   *
-   * @param parentGroupId the parent groupId
-   * @param parentArtifactId the parent's artifact Id needed for the url
-   * @param parentVersion the version of the parent pom needed for the url:with
-   * @return {@link String} of the fetched parent pom.xml
-   */
-  private static String fetchPomXml(
-      String parentGroupId, String parentArtifactId, String parentVersion) {
-    // replacing the "." with "/" becuase the maven repo uses "/" directories.
-    // so org.springframwork.boot => org/springframwork/boot which is what we actually need
-    String groupPath = parentGroupId.replace(".", "/");
-
-    try {
-      // Creating the url from the MavenCooridinates
-      String url =
-          BASE_URL
-              + groupPath //  org.springframwork.boot => org/springframwork/boot
-              + "/" // org/springframwork/boot/
-              + parentArtifactId // org/springframwork/boot/spring-boot-starter-parent
-              + "/" // org/springframwork/boot/spring-boot-starter-parent/
-              + parentVersion // org/springframwork/boot/spring-boot-starter-parent/4.0.6
-              + "/" // org/springframwork/boot/spring-boot-starter-parent/4.0.6/
-              + parentArtifactId // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent
-              + "-" // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-
-              + parentVersion // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6
-              + ".pom"; // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6.pom (the full link)
-
-      // Create a Java Http client to fetch the pom using the url above
-      HttpClient client = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-
-      // Send the request using the url and calling the GET method which returns the entire parent
-      // pom bom as a String
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-      if (response.statusCode() != 200) {
-        throw new RuntimeException("Failed to fetch BOM: " + response.statusCode());
-      }
-      return response.body();
-    } catch (Exception e) {
-      throw new RuntimeException("Error fetching BOM POM", e);
-    }
-  }
+  // /**
+  //  * This method uses the {@link MavenCooridinates} to form a link to fetch the pomxml from the
+  //  * maven repo
+  //  *
+  //  * @param parentGroupId the parent groupId
+  //  * @param parentArtifactId the parent's artifact Id needed for the url
+  //  * @param parentVersion the version of the parent pom needed for the url:with
+  //  * @return {@link String} of the fetched parent pom.xml
+  //  */
+  // private static String fetchPomXml(
+  //     String parentGroupId, String parentArtifactId, String parentVersion) {
+  //   // replacing the "." with "/" becuase the maven repo uses "/" directories.
+  //   // so org.springframwork.boot => org/springframwork/boot which is what we actually need
+  //   String groupPath = parentGroupId.replace(".", "/");
+  //
+  //   try {
+  //     // Creating the url from the MavenCooridinates
+  //     String url =
+  //         BASE_URL
+  //             + groupPath //  org.springframwork.boot => org/springframwork/boot
+  //             + "/" // org/springframwork/boot/
+  //             + parentArtifactId // org/springframwork/boot/spring-boot-starter-parent
+  //             + "/" // org/springframwork/boot/spring-boot-starter-parent/
+  //             + parentVersion // org/springframwork/boot/spring-boot-starter-parent/4.0.6
+  //             + "/" // org/springframwork/boot/spring-boot-starter-parent/4.0.6/
+  //             + parentArtifactId //
+  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent
+  //             + "-" //
+  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-
+  //             + parentVersion //
+  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6
+  //             + ".pom"; //
+  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6.pom
+  // (the full link)
+  //
+  //     // Create a Java Http client to fetch the pom using the url above
+  //     HttpClient client = HttpClient.newHttpClient();
+  //     HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+  //
+  //     // Send the request using the url and calling the GET method which returns the entire
+  // parent
+  //     // pom bom as a String
+  //     HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+  //
+  //     if (response.statusCode() != 200) {
+  //       throw new RuntimeException("Failed to fetch BOM: " + response.statusCode());
+  //     }
+  //     return response.body();
+  //   } catch (Exception e) {
+  //     throw new RuntimeException("Error fetching BOM POM", e);
+  //   }
+  // }
 }
