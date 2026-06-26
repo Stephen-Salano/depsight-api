@@ -1,7 +1,7 @@
 package io.depsight.api.analyse.controller;
 
 import io.depsight.api.analyse.dto.request.AnalyseRequest;
-import io.depsight.api.analyse.dto.request.ParsedDependency;
+import io.depsight.api.analyse.resolver.DependencyNode;
 import io.depsight.api.analyse.service.AnalyseService;
 import io.depsight.api.common.config.ApiResponse;
 import io.depsight.api.common.controller.BaseController;
@@ -28,7 +28,7 @@ public class AnalyseController extends BaseController {
 
   @PostMapping
   @Operation(summary = "Analyse a sample pom.xml")
-  public ResponseEntity<ApiResponse<List<ParsedDependency>>> analyse(
+  public ResponseEntity<ApiResponse<List<DependencyNode>>> analyse(
       @Valid @RequestBody AnalyseRequest request) {
     log.info("POST /api/analyse analysing pom.xml");
     return ok(analyseService.analyse(request), "POM parsed successfully");

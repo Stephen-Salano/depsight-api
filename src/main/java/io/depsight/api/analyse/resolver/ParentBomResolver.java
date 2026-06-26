@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class ParentBomResolver {
-  // TODO: Add @Service when we connect it to MavenCentralClient => turn it into a Spring class
 
   private static final String UNRESOLVED = "UNRESOLVED";
   // private static final String BASE_URL = "https://repo1.maven.org/maven2/";
