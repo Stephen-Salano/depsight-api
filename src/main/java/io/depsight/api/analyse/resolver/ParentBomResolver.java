@@ -14,7 +14,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+/**
+ * Helps resolve dependencies marked as "UNRESOLVED" by {@link PomParser} parse() method - Fetches
+ * the parent BOM from maven central repo using the MavenCentralClient - Finds the unresolved
+ * version - returs a clean ParsedDependency
+ */
 @RequiredArgsConstructor
 @Slf4j
 @Service
@@ -80,6 +87,32 @@ public class ParentBomResolver {
     return applyBom(dependencies, bom);
   }
 
+  public Mono<Map<String, String>> resolveBomImports(
+      List<MavenCooridinates> imports, Map<String, String> properties) {
+
+    return Flux.fromIterable(imports)
+        .flatMap(
+            coord ->
+                mavenCentralClient
+                    .fetchPomXml(
+                        coord.parentGroupId(), coord.parentArtifactId(), coord.parentVersion())
+                    .map(
+                        pomXml -> {
+                          Model model = PomParser.parse(pomXml);
+                          Map<String, String> resolvedProps = PomParser.extractProperties(model);
+                          return extractBom(model, resolvedProps);
+                        }))
+        .collectList()
+        .map(
+            bomList -> {
+              Map<String, String> merged = new HashMap<>();
+              for (Map<String, String> bom : bomList) {
+                merged.putAll(bom);
+              }
+              return merged;
+            });
+  }
+
   /**
    * This method takes all dependencies and looks up dependencies with "UNRESOLVED" versions and
    * replaces them with Parent BOM versions
@@ -135,57 +168,4 @@ public class ParentBomResolver {
     }
     return bom;
   }
-
-  // /**
-  //  * This method uses the {@link MavenCooridinates} to form a link to fetch the pomxml from the
-  //  * maven repo
-  //  *
-  //  * @param parentGroupId the parent groupId
-  //  * @param parentArtifactId the parent's artifact Id needed for the url
-  //  * @param parentVersion the version of the parent pom needed for the url:with
-  //  * @return {@link String} of the fetched parent pom.xml
-  //  */
-  // private static String fetchPomXml(
-  //     String parentGroupId, String parentArtifactId, String parentVersion) {
-  //   // replacing the "." with "/" becuase the maven repo uses "/" directories.
-  //   // so org.springframwork.boot => org/springframwork/boot which is what we actually need
-  //   String groupPath = parentGroupId.replace(".", "/");
-  //
-  //   try {
-  //     // Creating the url from the MavenCooridinates
-  //     String url =
-  //         BASE_URL
-  //             + groupPath //  org.springframwork.boot => org/springframwork/boot
-  //             + "/" // org/springframwork/boot/
-  //             + parentArtifactId // org/springframwork/boot/spring-boot-starter-parent
-  //             + "/" // org/springframwork/boot/spring-boot-starter-parent/
-  //             + parentVersion // org/springframwork/boot/spring-boot-starter-parent/4.0.6
-  //             + "/" // org/springframwork/boot/spring-boot-starter-parent/4.0.6/
-  //             + parentArtifactId //
-  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent
-  //             + "-" //
-  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-
-  //             + parentVersion //
-  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6
-  //             + ".pom"; //
-  // org/springframwork/boot/spring-boot-starter-parent/4.0.6/spring-boot-starter-parent-4.0.6.pom
-  // (the full link)
-  //
-  //     // Create a Java Http client to fetch the pom using the url above
-  //     HttpClient client = HttpClient.newHttpClient();
-  //     HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-  //
-  //     // Send the request using the url and calling the GET method which returns the entire
-  // parent
-  //     // pom bom as a String
-  //     HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-  //
-  //     if (response.statusCode() != 200) {
-  //       throw new RuntimeException("Failed to fetch BOM: " + response.statusCode());
-  //     }
-  //     return response.body();
-  //   } catch (Exception e) {
-  //     throw new RuntimeException("Error fetching BOM POM", e);
-  //   }
-  // }
 }

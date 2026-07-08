@@ -58,6 +58,14 @@ public class PomParser {
     return new MavenCooridinates(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
   }
 
+  /**
+   * Turns a model Dependency into a {@link ParsedDependency} It does not fetch anything from maven
+   * central repo it simply reads the user's XML
+   *
+   * @param model Java object of the pom.xml
+   * @param properties a map of pom.xml properties section
+   * @return list of {@link ParsedDependency}
+   */
   public static List<ParsedDependency> extractDependencies(
       Model model, Map<String, String> properties) {
     // get deps
@@ -65,19 +73,23 @@ public class PomParser {
     List<ParsedDependency> result = new ArrayList<>();
     String groupId, artifactId, version, scope;
     for (Dependency dependency : parsedDependencies) {
+      // get each dependency's group, artifacst and version
       groupId = dependency.getGroupId();
       artifactId = dependency.getArtifactId();
       version = dependency.getVersion();
       scope = dependency.getScope();
 
+      // if the version is a place holder we try and see if we can fetch from properties section
       if (version != null && version.startsWith("${")) {
         String key = version.substring(2, version.length() - 1);
         version = properties.getOrDefault(key, UNRESOLVED);
       }
+      // if the version came in null, just mark as UNRESOLVED
       if (version == null) {
         version = UNRESOLVED;
       }
 
+      // add the new ParsedDependency to the empty list
       result.add(new ParsedDependency(groupId, artifactId, version, scope));
     }
     return result;
@@ -100,6 +112,51 @@ public class PomParser {
           .forEach((key, value) -> properties.put(key.toString(), value.toString()));
     }
     return properties;
+  }
+
+  /**
+   * Scans springboot dependencies and pulls out the import entries (like micrometer), resolving
+   * microemter version of microemter.version -> 1.16.5 using properties
+   *
+   * @param model the raw parsed pom.xml
+   * @param properties all the dependency versions listed in a properties section in a map
+   * @return a List of traversed dependency nodes
+   */
+  public static List<MavenCooridinates> extractImports(
+      Model model, Map<String, String> properties) {
+    List<MavenCooridinates> cooridinates = new ArrayList<>();
+
+    if (model.getDependencyManagement() == null) {
+      return cooridinates;
+    }
+    List<Dependency> extractedDeps = model.getDependencyManagement().getDependencies();
+
+    String parentGroupId, parentArtifactId, parentVersion, scope, type;
+    for (Dependency dep : extractedDeps) {
+      parentGroupId = dep.getGroupId();
+      parentArtifactId = dep.getArtifactId();
+      parentVersion = dep.getVersion();
+      scope = dep.getScope();
+      type = dep.getType();
+
+      if (type.equals("pom") && scope.equals("import")) {
+        if (parentVersion == null) {
+          log.info(
+              "import {groupId}:{artifactId} has no version, marking UNRESOLVED",
+              parentGroupId,
+              parentArtifactId);
+          parentVersion = UNRESOLVED;
+        }
+        if (parentVersion.startsWith("${")) {
+          String key = parentVersion.substring(2, parentVersion.length() - 1);
+          parentVersion = properties.getOrDefault(key, UNRESOLVED);
+        }
+      } else {
+        continue;
+      }
+      cooridinates.add(new MavenCooridinates(parentGroupId, parentArtifactId, parentVersion));
+    }
+    return cooridinates;
   }
 
   private static void validatePom(String cleanedPom) throws BadRequestException {
