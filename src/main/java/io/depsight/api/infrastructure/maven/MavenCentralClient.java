@@ -1,10 +1,12 @@
 package io.depsight.api.infrastructure.maven;
 
+import io.depsight.api.common.enums.ExternalApiSource;
 import io.depsight.api.common.exception.ExternalApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
 
 @Service
 @Slf4j
@@ -17,6 +19,13 @@ public class MavenCentralClient {
   }
 
   public Mono<String> fetchPomXml(String groupId, String artifactId, String version) {
+    String key =
+        groupId
+            + ":"
+            + artifactId
+            + ":"
+            + version; // stores our url so our log looks like : Fetched
+    // org.springframework:spring-core:7.0.7 in 312ms
     return client
         .get()
         .uri(buildUrl(groupId, artifactId, version))
@@ -24,8 +33,14 @@ public class MavenCentralClient {
         .onStatus(status -> status.value() == 404, resp -> Mono.empty())
         .onStatus(
             status -> status.isError(),
-            resp -> Mono.error(new ExternalApiException("Something went wrong while fetching")))
+            resp ->
+                Mono.error(
+                    new ExternalApiException(
+                        "Something went wrong while fetching", ExternalApiSource.MAVEN_CENTRAL)))
         .bodyToMono(String.class)
+        .elapsed()
+        .doOnNext(tuple -> log.info("Fetched {} in {}ms", key, tuple.getT1()))
+        .map(Tuple2::getT2)
         .onErrorResume(ExternalApiException.class, e -> Mono.error(e));
   }
 

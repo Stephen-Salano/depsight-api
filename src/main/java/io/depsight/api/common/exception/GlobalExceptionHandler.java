@@ -25,11 +25,10 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.error(ex.getMessage(), errorDetails));
   }
 
-  // TODO: Add a source field so the error code can be MAVEN_CENTRAL_ERROR or OSS_INDEX_ERROR
   @ExceptionHandler(ExternalApiException.class)
   public ResponseEntity<ApiResponse<Void>> handleExternalApiException(ExternalApiException ex) {
     log.warn("External API exception occurred: {}", ex.getMessage());
-    ErrorResponse errorDetails = ErrorResponse.of(ex.getMessage(), "ERROR_WITH_EXTERNAL_API");
+    ErrorResponse errorDetails = ErrorResponse.of(ex.getMessage(), ex.getSource().toErrorCode());
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
         .body(ApiResponse.error(ex.getMessage(), errorDetails));
   }
@@ -58,5 +57,16 @@ public class GlobalExceptionHandler {
     ErrorResponse errorDetails = ErrorResponse.of("An unexpected error occurred", "INTERNAL_ERROR");
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(ApiResponse.error("An unexpected error occurred", errorDetails));
+  }
+
+  @ExceptionHandler(AnalysisTimeoutException.class)
+  public ResponseEntity<ApiResponse<Void>> handleAnalysisTimeout(AnalysisTimeoutException ex) {
+    // ex.getSource -> the getter in ExternalApiException
+    // ex.getMessage -> standard AnalysisTimeoutException
+    // ex.getSource.toErrorCode() -> our custom enum error code get's used
+    log.warn("Analysis timeout from source :{}", ex.getSource());
+    ErrorResponse errorDetails = ErrorResponse.of(ex.getMessage(), ex.getSource().toErrorCode());
+    return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+        .body(ApiResponse.error(ex.getMessage(), errorDetails));
   }
 }

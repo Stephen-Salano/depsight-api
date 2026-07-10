@@ -7,4 +7,4 @@ import jakarta.validation.constraints.NotBlank;
  *
  * @param pomXml the user pasted/attatched pom.xml file or string
  */
-public record AnalyseRequest(@NotBlank String pomXml) {}
+public record AnalyseRequest(@NotBlank String pomXml, Integer maxDepth) {}

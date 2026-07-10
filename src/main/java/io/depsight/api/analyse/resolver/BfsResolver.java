@@ -4,6 +4,7 @@ import io.depsight.api.analyse.dto.request.MavenCooridinates;
 import io.depsight.api.analyse.dto.request.ParsedDependency;
 import io.depsight.api.analyse.parser.PomParser;
 import io.depsight.api.infrastructure.maven.MavenCentralClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,7 +24,7 @@ import reactor.core.publisher.Mono;
 public class BfsResolver {
 
   private final MavenCentralClient mavenCentralClient;
-  private static final int MAX_DEPTH = 4;
+  private static final int MAX_ALLOWED_DEPTH = 6;
   private static final String UNRESOLVED = "UNRESOLVED";
   private final ParentBomResolver parentBomResolver;
 
@@ -33,16 +34,18 @@ public class BfsResolver {
    * @param directDeps
    * @return
    */
-  public List<DependencyNode> resolve(List<ParsedDependency> directDeps) {
+  public List<DependencyNode> resolve(List<ParsedDependency> directDeps, int maxDepth) {
+    int cappedDepth = Math.min(maxDepth, MAX_ALLOWED_DEPTH);
     Set<String> visited = new HashSet<>();
     return Flux.fromIterable(directDeps)
-        .flatMap(dep -> resolveNode(dep, 0, visited))
+        .flatMap(dep -> resolveNode(dep, 0, cappedDepth, visited))
         .collectList()
+        .timeout(Duration.ofSeconds(15))
         .block();
   }
 
   private Mono<DependencyNode> resolveNode(
-      ParsedDependency dependency, int depth, Set<String> visited) {
+      ParsedDependency dependency, int depth, int maxDepth, Set<String> visited) {
     // guard checks
     if (UNRESOLVED.equals(dependency.version())
         || "test".equals(dependency.scope())
@@ -53,7 +56,7 @@ public class BfsResolver {
 
     visited.add(dependency.groupId() + ":" + dependency.artifactId());
     // The depth cap ()
-    if (depth >= MAX_DEPTH) {
+    if (depth >= maxDepth) {
       return Mono.just(
           new DependencyNode(
               dependency.groupId(),
@@ -103,7 +106,8 @@ public class BfsResolver {
 
                         Mono<List<DependencyNode>> childrenMono =
                             Flux.fromIterable(resolvedChildrenDeps)
-                                .flatMap(childDep -> resolveNode(childDep, depth + 1, visited))
+                                .flatMap(
+                                    childDep -> resolveNode(childDep, depth + 1, maxDepth, visited))
                                 .collectList();
 
                         return childrenMono.map(
