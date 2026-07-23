@@ -67,6 +67,7 @@ public class BfsResolver {
               List.of()));
     }
 
+    // Why FlatMap(), becuase our lambda returns Mono<Map<String, String>>
     return mavenCentralClient
         .fetchPomXml(dependency.groupId(), dependency.artifactId(), dependency.version())
         .flatMap(
