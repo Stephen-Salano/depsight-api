@@ -1,5 +1,6 @@
 package io.depsight.api.analyse.resolver;
 
+import io.depsight.api.analyse.dto.response.DependencyResult;
 import io.depsight.api.common.exception.ExternalApiException;
 import io.depsight.api.infrastructure.maven.MavenCentralClient;
 import java.util.ArrayList;
@@ -79,5 +80,69 @@ public class JarSizeEnricher {
 
   private String coordinateKey(DependencyNode node) {
     return node.groupId() + ":" + node.artifactId() + ":" + node.version();
+  }
+
+  /**
+   * Method takes a {@link DependencyNode} and transforms it to a DependencyResult 1. Flatten the
+   * tree 2. Fetch the Jar sizes of the flattened list 3. Transform the nodes to DependencyResult 4.
+   * Return a list of DependencyResult
+   *
+   * @param tree, the dependency tree of DependencyNode
+   * @return a List of DependencyResult
+   */
+  public List<DependencyResult> enrich(List<DependencyNode> tree) {
+
+    List<DependencyNode> flattenedList = flatten(tree);
+    Map<String, Long> sizes = fetchJarSizes(flattenedList).block();
+
+    return tree.stream().map(node -> transformNode(node, sizes)).toList();
+  }
+
+  private DependencyResult transformNode(DependencyNode node, Map<String, Long> sizes) {
+
+    Long sizeBytes = sizes.get(coordinateKey(node));
+    String humanReadableSize;
+
+    if (sizeBytes == null) {
+      humanReadableSize = "Unknown";
+    } else {
+      humanReadableSize = formatJarSize(sizeBytes); // now formatJarSize owns all byte formatting
+    }
+
+    // for (DependencyNode child : node.children()) {
+    //    result = transformNode(child, sizes);
+    // }
+    //
+    List<DependencyResult> children =
+        node.children().stream().map(child -> transformNode(child, sizes)).toList();
+
+    return new DependencyResult(
+        node.groupId(),
+        node.artifactId(),
+        node.version(),
+        node.scope(),
+        node.depth(),
+        sizeBytes,
+        humanReadableSize,
+        children);
+  }
+
+  private String formatJarSize(Long sizeInBytes) {
+    if (sizeInBytes == 0) return "0B";
+    if (sizeInBytes < 0) {
+      log.warn("Bytes less than 0");
+      return "Invalid size";
+    }
+    final String[] units = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
+
+    int unitIndex = (int) (Math.log(sizeInBytes) / Math.log(1024));
+
+    if (unitIndex >= units.length) {
+      unitIndex = units.length - 1;
+    }
+
+    double size = sizeInBytes / Math.pow(1024, unitIndex);
+
+    return String.format("%.2f %s", size, units[unitIndex]);
   }
 }
