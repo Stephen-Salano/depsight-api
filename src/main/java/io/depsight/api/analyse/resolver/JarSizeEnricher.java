@@ -1,5 +1,6 @@
 package io.depsight.api.analyse.resolver;
 
+import io.depsight.api.analyse.dto.response.AnalysisResult;
 import io.depsight.api.analyse.dto.response.DependencyResult;
 import io.depsight.api.common.exception.ExternalApiException;
 import io.depsight.api.infrastructure.maven.MavenCentralClient;
@@ -90,12 +91,15 @@ public class JarSizeEnricher {
    * @param tree, the dependency tree of DependencyNode
    * @return a List of DependencyResult
    */
-  public List<DependencyResult> enrich(List<DependencyNode> tree) {
+  public AnalysisResult enrich(List<DependencyNode> tree) {
 
     List<DependencyNode> flattenedList = flatten(tree);
     Map<String, Long> sizes = fetchJarSizes(flattenedList).block();
+    Long totalSizeBytes = sizes.values().stream().reduce(0L, Long::sum);
 
-    return tree.stream().map(node -> transformNode(node, sizes)).toList();
+    List<DependencyResult> dependencyResults =
+        tree.stream().map(node -> transformNode(node, sizes)).toList();
+    return new AnalysisResult(dependencyResults, totalSizeBytes, formatJarSize(totalSizeBytes));
   }
 
   private DependencyResult transformNode(DependencyNode node, Map<String, Long> sizes) {

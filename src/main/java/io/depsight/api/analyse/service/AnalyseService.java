@@ -1,10 +1,9 @@
 package io.depsight.api.analyse.service;
 
 import io.depsight.api.analyse.dto.request.AnalyseRequest;
-import io.depsight.api.analyse.resolver.DependencyNode;
-import java.util.List;
+import io.depsight.api.analyse.dto.response.AnalysisResult;
 
 public interface AnalyseService {
 
-  List<DependencyNode> analyse(AnalyseRequest request);
+  AnalysisResult analyse(AnalyseRequest request);
 }

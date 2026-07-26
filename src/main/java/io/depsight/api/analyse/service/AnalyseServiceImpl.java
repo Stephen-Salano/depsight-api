@@ -3,9 +3,11 @@ package io.depsight.api.analyse.service;
 import io.depsight.api.analyse.dto.request.AnalyseRequest;
 import io.depsight.api.analyse.dto.request.MavenCooridinates;
 import io.depsight.api.analyse.dto.request.ParsedDependency;
+import io.depsight.api.analyse.dto.response.AnalysisResult;
 import io.depsight.api.analyse.parser.PomParser;
 import io.depsight.api.analyse.resolver.BfsResolver;
 import io.depsight.api.analyse.resolver.DependencyNode;
+import io.depsight.api.analyse.resolver.JarSizeEnricher;
 import io.depsight.api.analyse.resolver.ParentBomResolver;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +24,10 @@ public class AnalyseServiceImpl implements AnalyseService {
 
   private final ParentBomResolver parentBomResolver;
   private final BfsResolver bfsResolver;
+  private final JarSizeEnricher jarSizeEnricher;
 
   @Override
-  public List<DependencyNode> analyse(AnalyseRequest request) {
+  public AnalysisResult analyse(AnalyseRequest request) {
     // extracting the maxDepth
     int maxDepth = Objects.requireNonNullElse(request.maxDepth(), 6);
 
@@ -38,10 +41,11 @@ public class AnalyseServiceImpl implements AnalyseService {
     // Get the parent from the pomXml model;
     MavenCooridinates cooridinates = PomParser.extractParent(model);
     if (cooridinates == null) {
-      return bfsResolver.resolve(dependencies, maxDepth);
+      List<DependencyNode> resolvedNodes = bfsResolver.resolve(dependencies, maxDepth);
+      return jarSizeEnricher.enrich(resolvedNodes);
     }
     List<ParsedDependency> resolved = parentBomResolver.resolveParent(cooridinates, dependencies);
     List<DependencyNode> node = bfsResolver.resolve(resolved, maxDepth);
-    return node;
+    return jarSizeEnricher.enrich(node);
   }
 }
