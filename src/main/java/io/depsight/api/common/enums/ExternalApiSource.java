@@ -2,7 +2,7 @@ package io.depsight.api.common.enums;
 
 public enum ExternalApiSource {
   MAVEN_CENTRAL,
-  OSS_INDEX,
+  OSV_DEV,
   DEP_DEV;
 
   public String toErrorCode() {
