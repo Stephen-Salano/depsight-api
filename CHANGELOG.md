@@ -31,6 +31,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `ExternalApiException` gained a `source` field (`ExternalApiSource` enum: `MAVEN_CENTRAL`, `OSS_INDEX`, `DEP_DEV`) with `toErrorCode()` producing codes like `MAVEN_CENTRAL_ERROR`; `AnalysisTimeoutException` now extends `ExternalApiException` and reuses the same source/error-code plumbing
   - `GlobalExceptionHandler` returns `504 Gateway Timeout` for `AnalysisTimeoutException`, `502 Bad Gateway` for other `ExternalApiException`s, both source-aware
 
+- M6: JAR size enrichment via Maven Central HEAD requests
+  - `JarSizeFetcher` fetches JAR sizes by issuing `HEAD` requests to `repo1.maven.org` and reading the `Content-Length` header; gracefully handles 404s and missing headers
+  - `DependencyResult` DTO introduced with per-dependency `sizeInBytes` and human-readable `size` field
+  - `AnalysisResult` wrapper returns the full dependency tree alongside `totalSizeBytes` and `totalSize`; JAR sizes are deduplicated across the tree (each unique `groupId:artifactId:version` counted once)
+  - `MavenCentralClient.buildUrl()` refactored to accept a file extension parameter (`.pom` or `.jar`) instead of hardcoding `.pom`
+  - `AnalyseRequest.maxDepth` moved from request parameter to request body (boxed `Integer`, `null` = use default)
+
+- M7: CVE/vulnerability enrichment via OSV (osv.dev)
+  - `OsvClient` with batch query (`POST /v1/querybatch`) and full detail fetch (`GET /v1/vulns/{id}`)
+  - Retry with exponential backoff (3 retries, 1 s initial, 5 s max) on 429 rate-limit, 5xx, and network errors
+  - `VulnerabilityFetcher` chunks dependencies into batches of 1 000 (OSV batch limit), runs 4 concurrent chunks and 8 concurrent detail fetches; failed detail fetches emit placeholder results (never silently lost), failed chunks fall back to empty maps
+  - `VulnerabilitySeverity` enum maps OSV `database_specific.severity` (Github LOW/MODERATE/HIGH/CRITICAL) to internal vocabulary; locale-independent normalisation via `Locale.ROOT` to avoid Turkish-locale `toUpperCase()` bugs
+  - `VulnerabilityResult` DTO with `cveId` extracted from OSV `aliases`, `severity` enum, and `cvssVector`; factory methods `fromOsv()` and `unavailable()`
+  - `AnalysisOrchestrator` runs JAR size and vulnerability enrichment concurrently via `Mono.zip()`, transforming the raw `DependencyNode` tree into the `DependencyResult` response tree
+  - `Chunker` utility for generic list chunking (`common/util`), with 8 unit tests in `ChunkerTest`
+  - Schema migration V2: dropped global unique constraint on `vuln_id`, added `severity` varchar column, fixed `references_url` type from `Map` to `List<Map>`
+
 ### Performance notes (deferred, not part of M5 scope)
 
 - Concurrency limiting on `flatMap` (capping to 8 parallel fetches) was tried and reverted — this work is I/O-bound, not CPU-bound, so capping concurrency serializes otherwise-overlapping network waits and increases total latency instead of reducing load.
