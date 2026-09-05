@@ -87,7 +87,6 @@ public class BfsResolverTest {
                 new ParsedDependency("com.example", "lib-a", "1.0", "compile"),
                 new ParsedDependency("com.example", "lib-b", "1.0", "compile"));
         ResolutionResult result = bfsResolver.resolve(directDeps, 6);
-        System.out.println("Collected keys: " + result.versionRequest().keySet());
 
         List<VersionRequest> commonsLoggingRequests = result.versionRequest().get("commons-logging:commons-logging");
 

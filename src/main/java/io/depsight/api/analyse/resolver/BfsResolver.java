@@ -58,19 +58,25 @@ public class BfsResolver {
             Set<String> visited,
             ConcurrentHashMap<String, List<VersionRequest>> versionCollector) {
 
+        // scope/version exclusion checks
+        if (UNRESOLVED.equals(dependency.version())
+                || "test".equals(dependency.scope())
+                || "provided".equals(dependency.scope())) {
+            return Mono.empty();
+        }
+
         VersionRequest versionRequest =
                 new VersionRequest(dependency.groupId(), dependency.artifactId(), dependency.version(), depth);
 
         String versionCollectorKey = dependency.groupId() + ":" + dependency.artifactId();
+
+        // collect requests before visited-set dedup so all competing versions are captured
         versionCollector
                 .computeIfAbsent(versionCollectorKey, key -> Collections.synchronizedList(new ArrayList<>()))
                 .add(versionRequest);
 
-        // guard checks
-        if (UNRESOLVED.equals(dependency.version())
-                || "test".equals(dependency.scope())
-                || "provided".equals(dependency.scope())
-                || visited.contains(dependency.groupId() + ":" + dependency.artifactId())) {
+        // visited-set dedup
+        if (visited.contains(dependency.groupId() + ":" + dependency.artifactId())) {
             return Mono.empty();
         }
 
