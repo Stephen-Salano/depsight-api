@@ -4,10 +4,10 @@ import io.depsight.api.analyse.dto.request.AnalyseRequest;
 import io.depsight.api.analyse.dto.request.MavenCooridinates;
 import io.depsight.api.analyse.dto.request.ParsedDependency;
 import io.depsight.api.analyse.dto.response.AnalysisResult;
+import io.depsight.api.analyse.dto.response.ResolutionResult;
 import io.depsight.api.analyse.parser.PomParser;
 import io.depsight.api.analyse.resolver.AnalysisOrchestrator;
 import io.depsight.api.analyse.resolver.BfsResolver;
-import io.depsight.api.analyse.resolver.DependencyNode;
 import io.depsight.api.analyse.resolver.ParentBomResolver;
 import java.util.List;
 import java.util.Map;
@@ -41,17 +41,17 @@ public class AnalyseServiceImpl implements AnalyseService {
         // Get the parent from the pomXml model;
         MavenCooridinates cooridinates = PomParser.extractParent(model);
         if (cooridinates == null) {
-            List<DependencyNode> resolvedNodes = bfsResolver.resolve(dependencies, maxDepth);
+            ResolutionResult resolvedNodes = bfsResolver.resolve(dependencies, maxDepth);
             return orchestrator
-                    .enrichTree(resolvedNodes)
+                    .enrichTree(resolvedNodes.tree())
                     .block(); // NOTE: blocking becuase AnalyseService interface returns a synchronous AnalysisResult we
             // need to call block()
         }
         List<ParsedDependency> resolved = parentBomResolver.resolveParent(cooridinates, dependencies);
-        List<DependencyNode> node = bfsResolver.resolve(resolved, maxDepth);
+        ResolutionResult node = bfsResolver.resolve(resolved, maxDepth);
         return orchestrator
-                .enrichTree(node)
+                .enrichTree(node.tree())
                 .block(); // NOTE: blocking becuase AnalyseService interface returns a synchronous AnalysisResult,
-                          // calling block()
+        // calling block()
     }
 }
