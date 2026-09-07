@@ -39,6 +39,9 @@ public class ConflictDetector {
 
             // Nearest wins (lowest depth). Stable sort preserves declaration order for ties.
             List<VersionRequest> sorted = new ArrayList<>(requests);
+            // Same-depth ties resolve via stable sort order, which approximates declaration
+            // order but isn't guaranteed under concurrent BFS. Accepted Phase 1 simplification —
+            // see M8 design doc "same-depth tie-break rule".
             sorted.sort(Comparator.comparingInt(VersionRequest::depth));
 
             String resolvedVersion = sorted.getFirst().version();
