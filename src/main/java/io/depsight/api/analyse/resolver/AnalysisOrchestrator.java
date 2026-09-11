@@ -40,7 +40,10 @@ public class AnalysisOrchestrator {
             List<DependencyResult> dependencyResults =
                     tree.stream().map(node -> transformNode(node, sizes, vulns)).toList();
 
-            return new AnalysisResult(dependencyResults, totalSizeBytes, formatJarSize(totalSizeBytes));
+            // TODO: Replace empty List.of() call when AnalysisOrchestrator is connected (only empty due to subtask 4
+            // requirements)
+            return new AnalysisResult(
+                    dependencyResults, totalSizeBytes, formatJarSize(totalSizeBytes), false, List.of());
         });
     }
 
