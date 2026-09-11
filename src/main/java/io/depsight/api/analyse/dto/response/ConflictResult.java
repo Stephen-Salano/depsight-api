@@ -15,5 +15,6 @@ public record ConflictResult(String key, String resolvedVersion, List<VersionReq
         requests = List.copyOf(requests);
     }
 
-    public record ConflictingVersion(String version, int depth) {}
+    // NOTE: The ConflictingVersion record was replaced by List<VersionRequest> because VersionRequest carried the full
+    // shape
 }
