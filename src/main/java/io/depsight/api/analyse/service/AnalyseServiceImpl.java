@@ -43,14 +43,14 @@ public class AnalyseServiceImpl implements AnalyseService {
         if (cooridinates == null) {
             ResolutionResult resolvedNodes = bfsResolver.resolve(dependencies, maxDepth);
             return orchestrator
-                    .enrichTree(resolvedNodes.tree())
+                    .enrichTree(resolvedNodes)
                     .block(); // NOTE: blocking becuase AnalyseService interface returns a synchronous AnalysisResult we
             // need to call block()
         }
         List<ParsedDependency> resolved = parentBomResolver.resolveParent(cooridinates, dependencies);
         ResolutionResult node = bfsResolver.resolve(resolved, maxDepth);
         return orchestrator
-                .enrichTree(node.tree())
+                .enrichTree(node)
                 .block(); // NOTE: blocking becuase AnalyseService interface returns a synchronous AnalysisResult,
         // calling block()
     }
