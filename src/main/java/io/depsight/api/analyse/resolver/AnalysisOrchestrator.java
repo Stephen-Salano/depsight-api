@@ -1,7 +1,9 @@
 package io.depsight.api.analyse.resolver;
 
 import io.depsight.api.analyse.dto.response.AnalysisResult;
+import io.depsight.api.analyse.dto.response.ConflictResult;
 import io.depsight.api.analyse.dto.response.DependencyResult;
+import io.depsight.api.analyse.dto.response.ResolutionResult;
 import io.depsight.api.analyse.dto.response.VulnerabilityResult;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,16 +22,18 @@ public class AnalysisOrchestrator {
 
     private final JarSizeFetcher jarSizeFetcher;
     private final VulnerabilityFetcher vulnerabilityFetcher;
+    private final ConflictDetector conflictDetector;
 
-    public Mono<AnalysisResult> enrichTree(List<DependencyNode> tree) {
+    public Mono<AnalysisResult> enrichTree(ResolutionResult resolutionResult) {
         // Flatten the tree once
-        List<DependencyNode> flattenedList = flatten(tree);
+        List<DependencyNode> flattenedList = flatten(resolutionResult.tree());
 
         // 2. Fetch sizes and vulnerabilities concurrently
         Mono<Map<String, Long>> sizeMono = jarSizeFetcher.fetchJarSizes(flattenedList);
         Mono<Map<String, List<VulnerabilityResult>>> vulnsMono =
                 vulnerabilityFetcher.fetchVulnerabilities(flattenedList);
-
+        // Calling the conflict detectors
+        List<ConflictResult> conflicts = conflictDetector.detectConflicts(resolutionResult.versionRequest());
         // 3 Combine the results reactively
         return Mono.zip(sizeMono, vulnsMono).map(tuple -> {
             Map<String, Long> sizes = tuple.getT1();
@@ -37,13 +41,12 @@ public class AnalysisOrchestrator {
 
             Long totalSizeBytes = sizes.values().stream().reduce(0L, Long::sum);
 
-            List<DependencyResult> dependencyResults =
-                    tree.stream().map(node -> transformNode(node, sizes, vulns)).toList();
+            List<DependencyResult> dependencyResults = resolutionResult.tree().stream()
+                    .map(node -> transformNode(node, sizes, vulns))
+                    .toList();
 
-            // TODO: Replace empty List.of() call when AnalysisOrchestrator is connected (only empty due to subtask 4
-            // requirements)
             return new AnalysisResult(
-                    dependencyResults, totalSizeBytes, formatJarSize(totalSizeBytes), false, List.of());
+                    dependencyResults, totalSizeBytes, formatJarSize(totalSizeBytes), false, conflicts);
         });
     }
 

@@ -13,7 +13,6 @@ public record AnalysisResult(
         // never null list of conflicts
         if (conflicts == null) {
             conflicts = List.of();
-            hasConflicts = false;
         }
         hasConflicts = !conflicts.isEmpty();
     }
