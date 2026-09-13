@@ -34,7 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - M6: JAR size enrichment via Maven Central HEAD requests
   - `JarSizeFetcher` fetches JAR sizes by issuing `HEAD` requests to `repo1.maven.org` and reading the `Content-Length` header; gracefully handles 404s and missing headers
   - `DependencyResult` DTO introduced with per-dependency `sizeInBytes` and human-readable `size` field
-  - `AnalysisResult` wrapper returns the full dependency tree alongside `totalSizeBytes` and `totalSize`; JAR sizes are deduplicated across the tree (each unique `groupId:artifactId:version` counted once)
+  - `AnalysisResult` wrapper returns the full dependency tree alongside `totalSizeBytes`, `totalSize`, `conflicts` (`List<ConflictResult>`), and `hasConflicts`; JAR sizes are deduplicated across the tree (each unique `groupId:artifactId:version` counted once)
   - `MavenCentralClient.buildUrl()` refactored to accept a file extension parameter (`.pom` or `.jar`) instead of hardcoding `.pom`
   - `AnalyseRequest.maxDepth` moved from request parameter to request body (boxed `Integer`, `null` = use default)
 
@@ -47,6 +47,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `AnalysisOrchestrator` runs JAR size and vulnerability enrichment concurrently via `Mono.zip()`, transforming the raw `DependencyNode` tree into the `DependencyResult` response tree
   - `Chunker` utility for generic list chunking (`common/util`), with 8 unit tests in `ChunkerTest`
   - Schema migration V2: dropped global unique constraint on `vuln_id`, added `severity` varchar column, fixed `references_url` type from `Map` to `List<Map>`
+
+- M8: Version conflict detection
+  - `BfsResolver` captures a `VersionRequest` (coordinates, version, depth) for every node during BFS *before* the visited-set guard discards duplicates, so all competing versions are collected
+  - `ConflictDetector` resolves each conflict nearest-wins (lowest depth); same-depth ties are broken via stable sort order — a documented Phase 1 simplification, not Maven-exact behavior
+  - `AnalysisResult` now includes `conflicts` (`List<ConflictResult>`) and `hasConflicts` (`boolean`), always derived from the conflict list — `hasConflicts` is `true` iff `conflicts` is non-empty
+  - `ConflictResult` exposes `key`, `resolvedVersion`, and `requests` (the requesting coordinates and versions)
 
 ### Performance notes (deferred, not part of M5 scope)
 

@@ -4,7 +4,7 @@ Java dependency analysis tool — paste your `pom.xml` and instantly see your
 full dependency graph, JAR sizes, CVEs, and version conflicts.
 
 ## Status
-Phase 1 complete (M3–M7)
+Phase 1 complete (M3–M8)
 
 ## Tech Stack
 - Java 21 + Spring Boot 4.0.6
@@ -18,10 +18,10 @@ Phase 1 complete (M3–M7)
 - JAR size estimation via Maven Central HEAD requests
 - CVE/vulnerability scanning via OSV (osv.dev) with batch queries
 - Severity mapping (LOW / MEDIUM / HIGH / CRITICAL)
+- Version conflict detection (nearest-wins; same-depth ties via stable order — Phase 1 simplification)
 - Request-level timeout and source-aware error handling
 
 ### Planned
-- Version conflict detection
 - Single dependency search
 - Platform analytics dashboard
 
